@@ -25,7 +25,7 @@ frame_final = None
 foto_tomada = False
 inicio = None
 DURACION = 5  # segundos de cuenta regresiva
-boton_rect = (30, 30, 220, 70)  # x, y, ancho, alto
+boton_rect = (30, 30, 120, 40)  # x, y, ancho, alto (más pequeño)
 pokemon_actuales = {}
 
 # === Funciones ===
@@ -43,8 +43,8 @@ def pokemon_for_face(rect):
 def dibujar_boton(frame):
     x, y, w, h = boton_rect
     cv2.rectangle(frame, (x,y), (x+w, y+h), (0,0,255), -1)
-    cv2.putText(frame, "Reiniciar", (x+15, y+50),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255,255,255), 3)
+    cv2.putText(frame, "Reiniciar", (x+10, y+28),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
 
 def click_event(event, x, y, flags, param):
     global inicio, foto_tomada, frame_final, pokemon_actuales
@@ -82,11 +82,14 @@ while True:
     for i, rect in enumerate(faces):
         if i not in pokemon_actuales or not foto_tomada:
             idx, img, nombre = pokemon_for_face(rect)
-            pokemon_actuales[i] = img
+            pokemon_actuales[i] = (img, nombre)  # Guarda imagen y nombre
         x, y, w, h = rect
         px, py = x, y - h
+        img, nombre = pokemon_actuales[i]
         if px >= 0 and py >= 0 and px+w <= frame.shape[1] and py+h <= frame.shape[0]:
-            frame = overlay_image(frame, pokemon_actuales[i], px, py, w, h)
+            frame = overlay_image(frame, img, px, py, w, h)
+            # Dibuja el nombre encima de la imagen
+            cv2.putText(frame, nombre, (px, py-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
         cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), 2)
 
     # Inicializar tiempo si hay caras
