@@ -12,7 +12,7 @@ face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades +
 # === Cargar imágenes y nombres de Pokémons ===
 pokemons_dir = "Pokemon"
 pokemon_imgs = []
-pokemon_nombres = [],
+pokemon_nombres = []
 
 for fname in sorted(os.listdir(pokemons_dir)):
     if fname.endswith((".png", ".jpg", ".jpeg")):
@@ -27,8 +27,12 @@ frame_final = None
 foto_tomada = False
 inicio = None
 DURACION = 5  # segundos de cuenta regresiva
-boton_rect = (30, 30, 120, 40)
-boton_save_rect = (170, 30, 120, 40)
+
+# botones adaptados para 1280x720, en la parte inferior
+boton_reiniciar   = (50, 650, 150, 50)   # Reiniciar
+boton_guardar     = (250, 650, 150, 50)  # Guardar
+boton_actualizar  = (450, 650, 150, 50)  # Actualizar
+
 pokemon_actuales = {}
 confeti_coords = []
 confeti_anim = 0
@@ -52,23 +56,23 @@ def pokemon_for_face(rect):
     idx = int(hsh, 16) % len(pokemon_imgs)
     return idx, pokemon_imgs[idx], pokemon_nombres[idx]
 
-def dibujar_boton(frame):
-    x, y, w, h = boton_rect
-    cv2.rectangle(frame, (x,y), (x+w, y+h), (0,0,255), -1)
-    cv2.putText(frame, "Reiniciar", (x+10, y+28),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
-
-def dibujar_boton_save(frame):
-    x, y, w, h = boton_save_rect
-    cv2.rectangle(frame, (x,y), (x+w, y+h), (0,128,0), -1)
-    cv2.putText(frame, "Guardar", (x+15, y+28),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+def draw_button(img, rect, text, color):
+    x, y, w, h = rect
+    cv2.rectangle(img, (x, y), (x + w, y + h), color, -1)
+    # Ajustar fuente al tamaño del botón
+    font_scale = 0.9
+    thickness = 2
+    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+    text_x = x + (w - text_size[0]) // 2
+    text_y = y + (h + text_size[1]) // 2
+    cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255,255,255), thickness)
 
 def click_event(event, x, y, flags, param):
     global inicio, foto_tomada, frame_final, pokemon_actuales, confeti_coords, confeti_anim
     if event == cv2.EVENT_LBUTTONDOWN:
-        bx, by, bw, bh = boton_rect
-        bx2, by2, bw2, bh2 = boton_save_rect
+        bx, by, bw, bh = boton_reiniciar
+        bx2, by2, bw2, bh2 = boton_guardar
+        bx3, by3, bw3, bh3 = boton_actualizar
         if bx <= x <= bx+bw and by <= y <= by+bh:
             # Reiniciar todo
             inicio = None
@@ -77,12 +81,18 @@ def click_event(event, x, y, flags, param):
             pokemon_actuales = {}
             confeti_coords = []
             confeti_anim = 0
+            print("Reiniciado")
         elif foto_tomada and bx2 <= x <= bx2+bw2 and by2 <= y <= by2+bh2:
             # Guardar imagen
             if frame_final is not None:
                 nombre_archivo = f"foto_pokemon_{int(time.time())}.png"
                 cv2.imwrite(nombre_archivo, frame_final)
                 print(f"Foto guardada como {nombre_archivo}")
+        elif foto_tomada and bx3 <= x <= bx3+bw3 and by3 <= y <= by3+bh3:
+            # Actualizar (reiniciar cuenta regresiva)
+            inicio = time.time()
+            foto_tomada = False
+            print("Actualizar presionado")
 
 def draw_countdown(frame, segundos_restantes):
     texto = f"{segundos_restantes}"
@@ -126,9 +136,9 @@ def dibujar_confeti(frame, coords):
         cv2.circle(frame, (int(x), int(y)), radius, color, -1)
 
 # === Ventana y callback ===
-cv2.namedWindow("Pokémon filtro estilo TikTok", cv2.WND_PROP_FULLSCREEN)
-cv2.setWindowProperty("Pokémon filtro estilo TikTok", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-cv2.setMouseCallback("Pokémon filtro estilo TikTok", click_event)
+cv2.namedWindow("Pokemon filtro estilo TikTok", cv2.WND_PROP_FULLSCREEN)
+cv2.setWindowProperty("Pokemon filtro estilo TikTok", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+cv2.setMouseCallback("Pokemon filtro estilo TikTok", click_event)
 
 # === Webcam ===
 cap = cv2.VideoCapture(0)
@@ -173,7 +183,8 @@ while True:
     # Cuenta regresiva visual
     if inicio and not foto_tomada:
         segundos_restantes = max(0, int(DURACION - (time.time() - inicio)))
-        draw_countdown(frame, segundos_restantes)
+        if segundos_restantes > 0:
+            draw_countdown(frame, segundos_restantes)
 
     # Congelar imagen después de DURACION segundos
     if inicio and not foto_tomada and (time.time() - inicio >= DURACION):
@@ -190,9 +201,9 @@ while True:
             dibujar_confeti(frame, confeti_coords)
             confeti_anim += 1
 
-    # Texto en la parte superior sobre los Pokémon
+    # Texto superior
     if len(faces) > 0:
-        texto = "¿Qué Pokémon eres?"
+        texto = "Que Pokemon eres:"
         font = cv2.FONT_HERSHEY_SIMPLEX
         escala = 1.5
         grosor = 3
@@ -201,11 +212,12 @@ while True:
         y_texto = 50
         cv2.putText(frame, texto, (x_texto, y_texto), font, escala, (0,255,255), grosor)
 
-    dibujar_boton(frame)
-    if foto_tomada:
-        dibujar_boton_save(frame)
+    # Dibujar botones siempre visibles
+    draw_button(frame, boton_reiniciar, "Reiniciar", (0,0,255))
+    draw_button(frame, boton_guardar, "Guardar", (0,128,0))
+    
 
-    cv2.imshow("Pokémon filtro estilo TikTok", frame)
+    cv2.imshow("Pokemon filtro estilo TikTok", frame)
 
     key = cv2.waitKey(1) & 0xFF
     if key == 27:
